@@ -172,7 +172,7 @@ class AlchemyCollection(db_coll.DBCollection):
             '$le': '__le__',
             '$eq': '__eq__',
             '$ne': '__ne__',
-            '$like': 'like'
+            '$regex': 'regexp'
         }
         if not criteria:
             return []

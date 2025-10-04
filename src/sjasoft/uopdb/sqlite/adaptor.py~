@@ -7,8 +7,8 @@ from sqlalchemy import (inspect, PrimaryKeyConstraint, Column, Date,
                         insert, update, delete, and_, or_)
 from sqlalchemy.ext.declarative import declarative_base
 from uopmeta.schemas import meta
-from sjautils.dicts import first_kv
-from sjautils.env import home_path
+from sjasoft.utils.dicts import first_kv
+from sjasoft.utils.env import home_path
 from sqlalchemy.orm import sessionmaker
 import json
 
