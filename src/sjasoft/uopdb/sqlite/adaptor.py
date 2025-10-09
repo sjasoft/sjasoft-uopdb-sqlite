@@ -95,7 +95,7 @@ def create_index(table, columns):
     pass
 
 class AlchemyCollection(db_coll.DBCollection):
-    def __init__(self, db, table, indexed=False, tenant_modifier=None, *constraints):
+    def __init__(self, db, table, indexed=False, *constraints):
         # TODO consider preprocessed statements
         self._db= db
         self._engine = self._db._engine
