@@ -73,6 +73,13 @@ def columns_from(source, extractor):
 def make_table(base, table_name, columns):
     return Table(table_name, base, *columns)
 
+def table_from_schema(schema, name):
+    if isinstance(schema, meta.MetaClass):
+        return table_from_attrs(schema, Base.metadata, name)
+    elif isinstance(schema, BaseModel):
+        return table_from_pydantic(schema, Base.metadata, name)
+    else:
+        raise Exception(f'Expected MetaClass or MetaModel, got {type(schema)}')
 
 def table_from_pydantic(model, base, table_name=''):
     if not table_name:
@@ -297,46 +304,12 @@ class AlchemyDatabase(database.Database):
         default = f'{db_brand}:///{self._db_name}'
         return default
 
-    def get_managed_collection(self, coll_name):
-        coll = self.get_existing_collection(coll_name)
-        if not coll:
-            table = self.get_existing_table(coll_name)
-            if table:
-                coll = AlchemyCollection(self, table)
-            else:
-                raise Exception(f'Expected existing table named {coll_name}')
-        return coll
+    def wrap_raw_collection(self, raw):
+        return AlchemyCollection(self, raw)
 
-    def create_table(self, table_name, columns):
-        table = make_table(Base.metadata, table_name, columns)
-        table.create(self._engine)
-        return table
-    
-    def get_standard_collection(self, kind, tenant_modifier=None, name=''):
-        coll_name = name or uop_collection_names[kind]
-        coll = self.get_existing_collection(coll_name)
-        if coll:
-            return coll
-        schema = meta.kind_map[kind]
-        table = self.get_existing_table(coll_name)
-        if table is None:
-            # TODO remmeber to add secondary indices.
-            indices = meta.secondary_indices.get(kind)
-            columns = columns_from(schema, extract_model_fields)
-            table = self.create_table(coll_name, columns)
-            #table = table_from_pydantic(schema, Base.metadata, coll_name)
-            #table.create(self._engine)
-        return AlchemyCollection(self, table, tenant_modifier=tenant_modifier)
-
-    def get_instance_collection(self, cls):
-        as_dict = cls if isinstance(cls, dict) else cls.dict()
-        coll_name = cls['instance_collection'] or self.random_collection_name()
-
-        table = self.get_existing_table(coll_name)
-        if not table:
-            table = table_from_attrs(cls, Base.metadata, coll_name)
-            table.create(self._engine)
-        return AlchemyCollection(self, table)
+    def get_raw_collection(self, name, schema):
+        existing = self.get_existing_table(name)
+        return existing or table_from_schema(schema, name)
 
     def get_tables(self):
         metadata = Base.metadata
