@@ -260,16 +260,20 @@ class AlchemyCollection(db_coll.DBCollection):
 
 
 class AlchemyDatabase(database.Database):
-    def __init__(self, dbname, collections=None, db_brand='sqlite',
-                 tenancy='no_tenants', **dbcredentials):
-        self._db_name = home_path(dbname)
+    def __init__(self, dbname, tenant_id=None, db_brand='sqlite', *schemas, **dbcredentials):
+        self._db_name = dbname
+        self._db_brand = db_brand
+        self._tables = None
+        self._root_txn = None
+        self._connection = None
+        self._credentials = dbcredentials
+        super().__init__(tenant_id=tenant_id, *schemas, **dbcredentials)
+
+    def open_db(self):
         self._connection_string = self.get_connection_string(db_brand, dbcredentials)
         self._engine = create_engine(self._connection_string, json_serializer=json.dumps, json_deserializer=json.loads)
         self._tables = self.get_tables()
-        self._root_txn = None
-        self._connection = None
-        super().__init__(**dbcredentials)
-
+        super().open_db()
 
     def start_long_transaction(self):
         self._connection = self._engine.connect().__enter__()
@@ -301,8 +305,26 @@ class AlchemyDatabase(database.Database):
         return bool(self.get_existing_table(name))
 
     def get_connection_string(self, db_brand, dbcredentials):
-        default = f'{db_brand}:///{self._db_name}'
-        return default
+        if self._db_brand == 'sqlite':
+            in_memory = dbcredentials.pop('in_memory', False)
+            if in_memory:
+                return f'{self._db_brand}://:memory:'
+            else:
+                return f'{self._db_brand}:///{home_path(self._db_name)}'
+        else:
+            driver = self._credentials.pop('driver','')
+            if driver:
+                db_brand = f'{self._db_brand}+{driver}'
+            username = self._credentials.pop('username', '')
+            password = self._credentials.pop('password', '')
+            host = self._credentials.pop('host', 'localhost')
+            port = self._credentials.pop('port', '')
+            host_string = f'{host}:{port}' if port else host
+            if username and password:
+                return f'{db_brand}://{username}:{password}@{host_string}/{self._db_name}'
+            else:
+                raise Exception('username and database required')
+
 
     def wrap_raw_collection(self, raw):
         return AlchemyCollection(self, raw)
